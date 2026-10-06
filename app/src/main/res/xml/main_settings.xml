@@ -54,6 +54,13 @@
         app:iconSpaceReserved="false" />
 
     <PreferenceScreen
+        android:fragment="org.schabi.newpipe.settings.CustomKeywordBlockingFragment"
+        android:icon="@drawable/ic_filter_list"
+        android:key="custom_keyword_blocking_key"
+        android:title="@string/custom_keyword_blocking"
+        app:iconSpaceReserved="false" />
+
+    <PreferenceScreen
         android:fragment="org.schabi.newpipe.settings.DebugSettingsFragment"
         android:icon="@drawable/ic_bug_report"
         android:key="@string/debug_pref_screen_key"

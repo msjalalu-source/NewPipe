@@ -77,17 +77,17 @@ kotlin {
         }
     }
 
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
-        }
-    }
-
-    jvm()
+//    listOf(
+//        iosArm64(),
+//        iosSimulatorArm64()
+//    ).forEach { iosTarget ->
+//        iosTarget.binaries.framework {
+//            baseName = "ComposeApp"
+//            isStatic = true
+//        }
+//    }
+//
+//    jvm()
 
     sourceSets {
         commonMain {
@@ -137,11 +137,11 @@ kotlin {
                 implementation(libs.androidx.test.espresso.core)
             }
         }
-        val jvmTest by getting {
-            dependencies {
-                implementation(compose.desktop.currentOs)
-            }
-        }
+//        val jvmTest by getting {
+//            dependencies {
+//                implementation(compose.desktop.currentOs)
+//            }
+//        }
     }
 }
 

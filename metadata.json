@@ -1,0 +1,6 @@
+{
+  "name": "NewPipe",
+  "description": "A libre lightweight streaming front-end for Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

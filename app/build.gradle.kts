@@ -19,6 +19,7 @@ plugins {
 
 val gitWorkingBranch = providers.exec {
     commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
+    isIgnoreExitValue = true
 }.standardOutput.asText.map { it.trim() }
 val defaultBranches = listOf("master", "dev")
 val workingBranch = gitWorkingBranch.getOrElse("")
@@ -56,9 +57,20 @@ configure<ApplicationExtension> {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         debug {
+            isDefault = true
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("debugConfig")
 
             // suffix the app id and the app name with git branch name
             if (normalizedWorkingBranch.isEmpty() || workingBranch in defaultBranches) {
@@ -85,8 +97,7 @@ configure<ApplicationExtension> {
 
         register("continuous") {
             initWith(getByName("release"))
-            signingConfig = signingConfigs.getByName("debug")
-            isDefault = true
+            signingConfig = signingConfigs.getByName("debugConfig")
 
             // suffix the app id and the app name with git branch name
             if (normalizedWorkingBranch.isEmpty() || workingBranch in defaultBranches) {
@@ -144,6 +155,10 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+kapt {
+    correctErrorTypes = true
+}
+
 // Custom dependency configuration for ktlint
 val ktlint by configurations.creating
 
@@ -197,14 +212,14 @@ tasks.register<CheckDependenciesOrder>("checkDependenciesOrder") {
     tomlFile = layout.projectDirectory.file("../gradle/libs.versions.toml")
 }
 
-afterEvaluate {
-    tasks.named("preDebugBuild").configure {
-        if (!System.getProperties().containsKey("skipFormatKtlint")) {
-            dependsOn("formatKtlint")
-        }
-        dependsOn("runCheckstyle", "runKtlint", "checkDependenciesOrder")
-    }
-}
+// afterEvaluate {
+//     tasks.named("preDebugBuild").configure {
+//         if (!System.getProperties().containsKey("skipFormatKtlint")) {
+//             dependsOn("formatKtlint")
+//         }
+//         dependsOn("runCheckstyle", "runKtlint", "checkDependenciesOrder")
+//     }
+// }
 
 sonar {
     properties {

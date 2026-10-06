@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:key="custom_keyword_blocking_preferences"
+    android:title="@string/custom_keyword_blocking">
+
+    <EditTextPreference
+        android:key="add_keyword_pref_key"
+        android:title="@string/add_blocked_keyword"
+        android:summary="@string/add_blocked_keyword_summary"
+        android:dialogTitle="@string/add_blocked_keyword"
+        android:dialogMessage="@string/add_blocked_keyword_dialog_msg"
+        app:iconSpaceReserved="false" />
+
+    <PreferenceCategory
+        android:key="blocked_keywords_category"
+        android:title="@string/blocked_keywords_category_title"
+        app:iconSpaceReserved="false" />
+
+</PreferenceScreen>

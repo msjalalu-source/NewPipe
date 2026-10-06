@@ -68,6 +68,8 @@ public class SettingsActivity extends AppCompatActivity implements
     private static final String TAG = "SettingsActivity";
     private static final boolean DEBUG = MainActivity.DEBUG;
 
+    public static final String EXTRA_FRAGMENT_NAME = "extra_fragment_name";
+
     @IdRes
     private static final int FRAGMENT_HOLDER_ID = R.id.settings_fragment_holder;
 
@@ -109,8 +111,12 @@ public class SettingsActivity extends AppCompatActivity implements
                 }
             }
         } else {
+            final String fragmentName = getIntent().getStringExtra(EXTRA_FRAGMENT_NAME);
+            final Fragment initialFragment = fragmentName != null
+                    ? instantiateFragment(fragmentName)
+                    : new MainSettingsFragment();
             getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.settings_fragment_holder, new MainSettingsFragment())
+                    .replace(R.id.settings_fragment_holder, initialFragment)
                     .commit();
         }
 
