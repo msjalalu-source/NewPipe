@@ -28,10 +28,12 @@ import com.jakewharton.processphoenix.ProcessPhoenix;
 import net.newpipe.app.extensions.ContextKt;
 import net.newpipe.app.navigation.Destination;
 
+import org.schabi.newpipe.App;
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.NewPipeDatabase;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.RouterActivity;
+import org.schabi.newpipe.settings.CustomKeywordBlockingFragment;
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity;
 import org.schabi.newpipe.download.DownloadActivity;
 import org.schabi.newpipe.error.ErrorUtil;
@@ -380,6 +382,12 @@ public final class NavigationHelper {
 
     public static void openSearchFragment(final FragmentManager fragmentManager,
                                           final int serviceId, final String searchString) {
+        if (!TextUtils.isEmpty(searchString)
+                && CustomKeywordBlockingFragment.isSearchQueryBlocked(
+                        App.getInstance(), searchString)) {
+            Toast.makeText(App.getInstance(), R.string.search_blocked_by_keyword, Toast.LENGTH_SHORT).show();
+            return;
+        }
         defaultTransaction(fragmentManager)
                 .replace(R.id.fragment_holder, SearchFragment.getInstance(serviceId, searchString))
                 .addToBackStack(SEARCH_FRAGMENT_TAG)
@@ -690,6 +698,13 @@ public final class NavigationHelper {
     public static void openSettings(final Context context) {
         // TODO: Replace with "ContextKt.navigateTo(context, Destination.Settings.INSTANCE);" later
         final Intent intent = new Intent(context, SettingsActivity.class);
+        context.startActivity(intent);
+    }
+
+    public static void openCustomKeywordBlockingSettings(final Context context) {
+        final Intent intent = new Intent(context, SettingsActivity.class);
+        intent.putExtra(SettingsActivity.EXTRA_FRAGMENT_NAME,
+                CustomKeywordBlockingFragment.class.getName());
         context.startActivity(intent);
     }
 

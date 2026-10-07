@@ -35,6 +35,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -72,6 +73,7 @@ import org.schabi.newpipe.fragments.list.BaseListFragment;
 import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.ktx.ExceptionUtils;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
+import org.schabi.newpipe.settings.CustomKeywordBlockingFragment;
 import org.schabi.newpipe.settings.NewPipeSettings;
 import org.schabi.newpipe.util.Constants;
 import org.schabi.newpipe.util.DeviceUtils;
@@ -855,6 +857,11 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             Log.d(TAG, "search() called with: query = [" + theSearchString + "]");
         }
         if (theSearchString.isEmpty()) {
+            return;
+        }
+
+        if (CustomKeywordBlockingFragment.isSearchQueryBlocked(requireContext(), theSearchString)) {
+            Toast.makeText(requireContext(), R.string.search_blocked_by_keyword, Toast.LENGTH_SHORT).show();
             return;
         }
 
