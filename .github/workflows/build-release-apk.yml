@@ -1,15 +1,27 @@
-name: "Build unsigned release APK on master"
+name: "Build signed APK"
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - dev
+      - master
+    paths-ignore:
+      - 'README.md'
+      - 'doc/**'
+      - 'fastlane/**'
+      - 'assets/**'
+      - '.github/**/*.md'
+      - '.github/FUNDING.yml'
+      - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: 'master'
 
       - uses: actions/setup-java@v5
         with:
@@ -17,22 +29,39 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: "Build release APK"
-        run: ./gradlew assembleRelease --stacktrace
+      - name: "Set up debug keystore"
+        run: |
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          elif [ ! -f debug.keystore ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: "Build signed debug APK"
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: "Verify APK signature"
+        run: |
+          APKSIGNER=$(find $ANDROID_SDK_ROOT/build-tools $ANDROID_HOME/build-tools /opt/android/sdk/build-tools -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose app/build/outputs/apk/debug/*.apk
+          else
+            echo "apksigner not found, skipping signature check"
+          fi
 
       - name: "Rename APK"
         run: |
-          VERSION_NAME="$(jq -r ".elements[0].versionName" "app/build/outputs/apk/release/output-metadata.json")"
+          VERSION_NAME="$(jq -r ".elements[0].versionName" "app/build/outputs/apk/debug/output-metadata.json")"
           echo "Version name: $VERSION_NAME" >> "$GITHUB_STEP_SUMMARY"
           echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          cat "app/build/outputs/apk/release/output-metadata.json" >> "$GITHUB_STEP_SUMMARY"
+          cat "app/build/outputs/apk/debug/output-metadata.json" >> "$GITHUB_STEP_SUMMARY"
           echo >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          # assume there is only one APK in that folder
-          mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/NewPipe_v$VERSION_NAME.apk"
+          mv app/build/outputs/apk/debug/*.apk "app/build/outputs/apk/debug/NewPipe_v${VERSION_NAME}_debug.apk"
 
       - name: "Upload APK"
         uses: actions/upload-artifact@v7
         with:
-          name: app
-          path: app/build/outputs/apk/release/*.apk
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+
