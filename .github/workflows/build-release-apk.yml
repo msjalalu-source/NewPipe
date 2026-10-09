@@ -1,7 +1,33 @@
-name: "Build signed APK"
+name: "Build and publish signed APK"
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish APK to GitHub Releases'
+        type: boolean
+        required: true
+        default: true
+      tag_name:
+        description: 'Release tag (required if publishing, e.g. v0.29.1-debug.1)'
+        type: string
+        required: false
+        default: ''
+      release_title:
+        description: 'Release title (e.g. NewPipe Debug v0.29.1)'
+        type: string
+        required: false
+        default: ''
+      release_notes:
+        description: 'Release notes (optional)'
+        type: string
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        required: true
+        default: false
   push:
     branches:
       - dev
@@ -15,11 +41,14 @@ on:
       - '.github/FUNDING.yml'
       - '.github/ISSUE_TEMPLATE/**'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v6
 
@@ -75,7 +104,7 @@ jobs:
             echo "apksigner not found, skipping signature check"
           fi
 
-      - name: "Rename APK"
+      - name: "Prepare build summary"
         run: |
           VERSION_NAME="$(jq -r ".elements[0].versionName" "app/build/outputs/apk/debug/output-metadata.json")"
           echo "Version name: $VERSION_NAME" >> "$GITHUB_STEP_SUMMARY"
@@ -83,11 +112,84 @@ jobs:
           cat "app/build/outputs/apk/debug/output-metadata.json" >> "$GITHUB_STEP_SUMMARY"
           echo >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          mv app/build/outputs/apk/debug/*.apk "app/build/outputs/apk/debug/NewPipe_v${VERSION_NAME}_debug.apk"
 
-      - name: "Upload APK"
+      - name: "Upload APK artifact"
         uses: actions/upload-artifact@v7
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: "Validate and publish to GitHub Releases"
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ inputs.tag_name }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          APK_FILE="app/build/outputs/apk/debug/app-debug.apk"
+
+          # 1. Validate APK file exists and is non-empty
+          if [ ! -f "$APK_FILE" ]; then
+            echo "::error::Release APK file not found at $APK_FILE"
+            exit 1
+          fi
+          if [ ! -s "$APK_FILE" ]; then
+            echo "::error::Release APK file is empty (0 bytes) at $APK_FILE"
+            exit 1
+          fi
+          APK_SIZE=$(wc -c < "$APK_FILE")
+          echo "Validated APK: $APK_FILE ($APK_SIZE bytes)"
+
+          # 2. Validate tag name input
+          TAG_NAME=$(echo "$TAG_NAME" | xargs)
+          if [ -z "$TAG_NAME" ]; then
+            echo "::error::Release tag cannot be empty when publishing a release! Please specify a tag like v0.29.1-debug.1"
+            exit 1
+          fi
+
+          if ! [[ "$TAG_NAME" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "::error::Invalid tag name '$TAG_NAME'. Must contain only alphanumeric characters, dots, dashes, or underscores."
+            exit 1
+          fi
+
+          # Set default title if empty
+          if [ -z "$RELEASE_TITLE" ]; then
+            RELEASE_TITLE="$TAG_NAME"
+          fi
+
+          # 3. Check for tag / release collisions
+          echo "Checking if release '$TAG_NAME' already exists..."
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::GitHub Release with tag '$TAG_NAME' already exists! Aborting to avoid overwrite."
+            exit 1
+          fi
+
+          echo "Checking if Git tag '$TAG_NAME' already exists on remote..."
+          if git ls-remote --tags origin "refs/tags/$TAG_NAME" | grep -q "$TAG_NAME"; then
+            echo "::error::Git tag '$TAG_NAME' already exists on remote origin! Aborting to avoid tag collision."
+            exit 1
+          fi
+
+          # 4. Set default notes if empty
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Automated personal debug build of NewPipe from commit ${GITHUB_SHA} (branch: ${GITHUB_REF_NAME})."
+          fi
+
+          # 5. Create release and attach APK asset
+          EXTRA_ARGS=()
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            EXTRA_ARGS+=(--prerelease)
+          fi
+
+          echo "Publishing release '$TAG_NAME' for commit ${GITHUB_SHA}..."
+          gh release create "$TAG_NAME" "$APK_FILE" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TITLE" \
+            --notes "$RELEASE_NOTES" \
+            "${EXTRA_ARGS[@]}"
+
+          echo "SUCCESS: GitHub Release '$TAG_NAME' created with asset 'app-debug.apk'."
+
 
