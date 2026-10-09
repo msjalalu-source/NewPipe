@@ -54,7 +54,7 @@ jobs:
           distribution: "temurin"
           cache: 'gradle'
 
-      - name: "Restore debug keystore"
+      - name: "Restore or generate debug keystore"
         run: |
           TARGET_KEYSTORE="${GITHUB_WORKSPACE}/debug.keystore"
           BASE64_FILE="${GITHUB_WORKSPACE}/debug.keystore.base64"
@@ -63,12 +63,12 @@ jobs:
           if [ -s "${TARGET_KEYSTORE}" ]; then
             echo "Keystore already exists at ${TARGET_KEYSTORE} and is non-empty."
           elif [ -f "${BASE64_FILE}" ]; then
-            echo "Decoding ${BASE64_FILE} into ${TARGET_KEYSTORE}..."
+            echo "Found ${BASE64_FILE}. Restoring Build 81 debug keystore..."
             base64 --decode "${BASE64_FILE}" > "${TARGET_KEYSTORE}" || base64 -d "${BASE64_FILE}" > "${TARGET_KEYSTORE}"
           else
-            echo "::error::Neither ${TARGET_KEYSTORE} nor ${BASE64_FILE} exists in repository!"
-            ls -la "${GITHUB_WORKSPACE}"
-            exit 1
+            echo "Original Build 81 keystore file (debug.keystore or debug.keystore.base64) was not found in checked-out repository files."
+            echo "Generating safe personal-use debug keystore fallback on runner using keytool..."
+            keytool -genkey -v -keystore "${TARGET_KEYSTORE}" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
       - name: "Verify debug keystore exists"
@@ -135,6 +135,8 @@ jobs:
             echo "Keystore already exists."
           elif [ -f "${BASE64_FILE}" ]; then
             base64 --decode "${BASE64_FILE}" > "${TARGET_KEYSTORE}" || base64 -d "${BASE64_FILE}" > "${TARGET_KEYSTORE}"
+          else
+            keytool -genkey -v -keystore "${TARGET_KEYSTORE}" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
       - name: Run android tests
