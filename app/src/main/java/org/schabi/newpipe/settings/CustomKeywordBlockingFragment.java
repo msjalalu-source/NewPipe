@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.preference.EditTextPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -15,6 +16,7 @@ import androidx.preference.PreferenceManager;
 import org.schabi.newpipe.R;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -23,6 +25,21 @@ import java.util.Set;
 
 public class CustomKeywordBlockingFragment extends BasePreferenceFragment {
     public static final String KEY_BLOCKED_KEYWORDS = "custom_blocked_keywords";
+    public static final String KEY_DEFAULT_KEYWORDS_INITIALIZED =
+            "custom_blocked_keywords_defaults_initialized";
+
+    public static final List<String> DEFAULT_BLOCKED_KEYWORDS = Collections.unmodifiableList(
+            Arrays.asList(
+                    "Aashiq Banaya",
+                    "adult",
+                    "porn",
+                    "sex",
+                    "xxx",
+                    "18+",
+                    "intimate",
+                    "kiss"
+            )
+    );
 
     @Override
     public void onCreatePreferences(final Bundle savedInstanceState, final String rootKey) {
@@ -80,29 +97,109 @@ public class CustomKeywordBlockingFragment extends BasePreferenceFragment {
             for (final String kw : sortedKeywords) {
                 final Preference pref = new Preference(requireContext());
                 pref.setTitle(kw);
-                pref.setSelectable(false);
+                pref.setSummary(R.string.delete);
+                pref.setSelectable(true);
                 pref.setIconSpaceReserved(false);
+                pref.setOnPreferenceClickListener(p -> {
+                    new AlertDialog.Builder(requireContext())
+                            .setTitle(kw)
+                            .setMessage(R.string.delete_entry)
+                            .setPositiveButton(R.string.delete, (dialog, which) -> {
+                                removeBlockedKeyword(requireContext(), kw);
+                                updateKeywordsList();
+                            })
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show();
+                    return true;
+                });
                 category.addPreference(pref);
             }
         }
     }
 
+    private static synchronized void ensureDefaultsInitialized(@NonNull final Context context) {
+        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        if (sp.getBoolean(KEY_DEFAULT_KEYWORDS_INITIALIZED, false)) {
+            return;
+        }
+
+        final Set<String> currentKeywords = new HashSet<>();
+        if (sp.contains(KEY_BLOCKED_KEYWORDS)) {
+            final Set<String> existing = sp.getStringSet(KEY_BLOCKED_KEYWORDS, null);
+            if (existing != null) {
+                currentKeywords.addAll(existing);
+            }
+        }
+
+        // Merge defaults case-insensitively without replacing custom keywords or adding duplicates
+        for (final String defaultKeyword : DEFAULT_BLOCKED_KEYWORDS) {
+            boolean exists = false;
+            for (final String kw : currentKeywords) {
+                if (kw.equalsIgnoreCase(defaultKeyword)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                currentKeywords.add(defaultKeyword);
+            }
+        }
+
+        sp.edit()
+                .putStringSet(KEY_BLOCKED_KEYWORDS, currentKeywords)
+                .putBoolean(KEY_DEFAULT_KEYWORDS_INITIALIZED, true)
+                .apply();
+    }
+
     @NonNull
     public static Set<String> getBlockedKeywords(final Context context) {
+        if (context == null) {
+            return Collections.emptySet();
+        }
+        ensureDefaultsInitialized(context);
         final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
         final Set<String> set = sp.getStringSet(KEY_BLOCKED_KEYWORDS, Collections.emptySet());
         return set != null ? set : Collections.emptySet();
     }
 
     public static void addBlockedKeyword(final Context context, final String keyword) {
+        if (context == null || keyword == null || keyword.trim().isEmpty()) {
+            return;
+        }
+        final String trimmed = keyword.trim();
         final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
         final Set<String> current = new HashSet<>(getBlockedKeywords(context));
-        current.add(keyword.trim());
+        for (final String existing : current) {
+            if (existing.equalsIgnoreCase(trimmed)) {
+                return; // already exists
+            }
+        }
+        current.add(trimmed);
         sp.edit().putStringSet(KEY_BLOCKED_KEYWORDS, current).apply();
     }
 
+    public static void removeBlockedKeyword(final Context context, final String keyword) {
+        if (context == null || keyword == null || keyword.trim().isEmpty()) {
+            return;
+        }
+        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        final Set<String> current = new HashSet<>(getBlockedKeywords(context));
+        boolean removed = current.remove(keyword);
+        if (!removed) {
+            for (final String kw : new HashSet<>(current)) {
+                if (kw.equalsIgnoreCase(keyword.trim())) {
+                    current.remove(kw);
+                    removed = true;
+                }
+            }
+        }
+        if (removed) {
+            sp.edit().putStringSet(KEY_BLOCKED_KEYWORDS, current).apply();
+        }
+    }
+
     public static boolean isSearchQueryBlocked(final Context context, final String query) {
-        if (TextUtils.isEmpty(query)) {
+        if (context == null || query == null || query.trim().isEmpty()) {
             return false;
         }
         final Set<String> blockedKeywords = getBlockedKeywords(context);
@@ -111,11 +208,14 @@ public class CustomKeywordBlockingFragment extends BasePreferenceFragment {
         }
         final String lowerQuery = query.toLowerCase(Locale.ROOT);
         for (final String keyword : blockedKeywords) {
-            if (!TextUtils.isEmpty(keyword)
-                    && lowerQuery.contains(keyword.toLowerCase(Locale.ROOT))) {
-                return true;
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                final String trimmedKw = keyword.trim().toLowerCase(Locale.ROOT);
+                if (lowerQuery.contains(trimmedKw)) {
+                    return true;
+                }
             }
         }
         return false;
     }
 }
+
