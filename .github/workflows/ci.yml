@@ -54,13 +54,37 @@ jobs:
           distribution: "temurin"
           cache: 'gradle'
 
-      - name: Set up debug keystore
+      - name: "Restore debug keystore"
         run: |
-          if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-          elif [ ! -f debug.keystore ]; then
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          TARGET_KEYSTORE="${GITHUB_WORKSPACE}/debug.keystore"
+          BASE64_FILE="${GITHUB_WORKSPACE}/debug.keystore.base64"
+          echo "Target keystore path: ${TARGET_KEYSTORE}"
+
+          if [ -s "${TARGET_KEYSTORE}" ]; then
+            echo "Keystore already exists at ${TARGET_KEYSTORE} and is non-empty."
+          elif [ -f "${BASE64_FILE}" ]; then
+            echo "Decoding ${BASE64_FILE} into ${TARGET_KEYSTORE}..."
+            base64 --decode "${BASE64_FILE}" > "${TARGET_KEYSTORE}" || base64 -d "${BASE64_FILE}" > "${TARGET_KEYSTORE}"
+          else
+            echo "::error::Neither ${TARGET_KEYSTORE} nor ${BASE64_FILE} exists in repository!"
+            ls -la "${GITHUB_WORKSPACE}"
+            exit 1
           fi
+
+      - name: "Verify debug keystore exists"
+        run: |
+          TARGET_KEYSTORE="${GITHUB_WORKSPACE}/debug.keystore"
+          if [ ! -f "${TARGET_KEYSTORE}" ]; then
+            echo "::error::debug.keystore not found at expected path: ${TARGET_KEYSTORE}"
+            ls -la "${GITHUB_WORKSPACE}"
+            exit 1
+          fi
+          if [ ! -s "${TARGET_KEYSTORE}" ]; then
+            echo "::error::debug.keystore is empty (0 bytes) at: ${TARGET_KEYSTORE}"
+            exit 1
+          fi
+          FILE_SIZE=$(wc -c < "${TARGET_KEYSTORE}")
+          echo "SUCCESS: debug.keystore verified at ${TARGET_KEYSTORE} (${FILE_SIZE} bytes)."
 
       - name: Build debug APK and run jvm tests
         run: ./gradlew assembleContinuous lintContinuous testDebugUnitTest --stacktrace -DskipFormatKtlint
@@ -102,6 +126,16 @@ jobs:
           java-version: 21
           distribution: "temurin"
           cache: 'gradle'
+
+      - name: "Restore debug keystore"
+        run: |
+          TARGET_KEYSTORE="${GITHUB_WORKSPACE}/debug.keystore"
+          BASE64_FILE="${GITHUB_WORKSPACE}/debug.keystore.base64"
+          if [ -s "${TARGET_KEYSTORE}" ]; then
+            echo "Keystore already exists."
+          elif [ -f "${BASE64_FILE}" ]; then
+            base64 --decode "${BASE64_FILE}" > "${TARGET_KEYSTORE}" || base64 -d "${BASE64_FILE}" > "${TARGET_KEYSTORE}"
+          fi
 
       - name: Run android tests
         uses: reactivecircus/android-emulator-runner@v2
