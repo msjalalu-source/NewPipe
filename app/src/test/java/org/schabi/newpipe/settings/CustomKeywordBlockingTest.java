@@ -86,8 +86,12 @@ public class CustomKeywordBlockingTest {
         final Set<String> initialKeywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
         assertEquals(8, initialKeywords.size());
 
-        // User removes "kiss"
-        CustomKeywordBlockingFragment.removeBlockedKeyword(fakeContext, "kiss");
+        // Simulate an existing stored preference where a keyword was absent/removed
+        final Set<String> modified = new HashSet<>(initialKeywords);
+        modified.remove("kiss");
+        fakePreferences.edit()
+                .putStringSet(CustomKeywordBlockingFragment.KEY_BLOCKED_KEYWORDS, modified)
+                .apply();
 
         final Set<String> afterRemoval = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
         assertEquals(7, afterRemoval.size());

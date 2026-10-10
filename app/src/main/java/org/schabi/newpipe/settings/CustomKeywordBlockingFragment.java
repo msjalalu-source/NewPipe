@@ -7,7 +7,6 @@ import android.text.TextUtils;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.preference.EditTextPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -97,21 +96,8 @@ public class CustomKeywordBlockingFragment extends BasePreferenceFragment {
             for (final String kw : sortedKeywords) {
                 final Preference pref = new Preference(requireContext());
                 pref.setTitle(kw);
-                pref.setSummary(R.string.delete);
-                pref.setSelectable(true);
+                pref.setSelectable(false);
                 pref.setIconSpaceReserved(false);
-                pref.setOnPreferenceClickListener(p -> {
-                    new AlertDialog.Builder(requireContext())
-                            .setTitle(kw)
-                            .setMessage(R.string.delete_entry)
-                            .setPositiveButton(R.string.delete, (dialog, which) -> {
-                                removeBlockedKeyword(requireContext(), kw);
-                                updateKeywordsList();
-                            })
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .show();
-                    return true;
-                });
                 category.addPreference(pref);
             }
         }
@@ -176,26 +162,6 @@ public class CustomKeywordBlockingFragment extends BasePreferenceFragment {
         }
         current.add(trimmed);
         sp.edit().putStringSet(KEY_BLOCKED_KEYWORDS, current).apply();
-    }
-
-    public static void removeBlockedKeyword(final Context context, final String keyword) {
-        if (context == null || keyword == null || keyword.trim().isEmpty()) {
-            return;
-        }
-        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
-        final Set<String> current = new HashSet<>(getBlockedKeywords(context));
-        boolean removed = current.remove(keyword);
-        if (!removed) {
-            for (final String kw : new HashSet<>(current)) {
-                if (kw.equalsIgnoreCase(keyword.trim())) {
-                    current.remove(kw);
-                    removed = true;
-                }
-            }
-        }
-        if (removed) {
-            sp.edit().putStringSet(KEY_BLOCKED_KEYWORDS, current).apply();
-        }
     }
 
     public static boolean isSearchQueryBlocked(final Context context, final String query) {
