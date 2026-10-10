@@ -36,7 +36,14 @@ public class CustomKeywordBlockingFragment extends BasePreferenceFragment {
                     "xxx",
                     "18+",
                     "intimate",
-                    "kiss"
+                    "kiss",
+                    "0bAVd9jJE2Q&vl=en",
+                    "19E65tOn3tI",
+                    "kbObKrBoIjI",
+                    "3QCgD4R4Ly8",
+                    "RlbGLrMuZ5I",
+                    "7vBsI0Hv5L0",
+                    "Hot"
             )
     );
 

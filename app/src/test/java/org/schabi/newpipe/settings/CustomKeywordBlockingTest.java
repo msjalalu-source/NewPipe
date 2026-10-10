@@ -28,10 +28,10 @@ public class CustomKeywordBlockingTest {
     }
 
     @Test
-    public void testInitializationContainsAllEightDefaults() {
+    public void testInitializationContainsAllDefaultKeywords() {
         final Set<String> keywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
 
-        assertEquals(8, keywords.size());
+        assertEquals(15, keywords.size());
         assertTrue(keywords.contains("Aashiq Banaya"));
         assertTrue(keywords.contains("adult"));
         assertTrue(keywords.contains("porn"));
@@ -40,6 +40,13 @@ public class CustomKeywordBlockingTest {
         assertTrue(keywords.contains("18+"));
         assertTrue(keywords.contains("intimate"));
         assertTrue(keywords.contains("kiss"));
+        assertTrue(keywords.contains("0bAVd9jJE2Q&vl=en"));
+        assertTrue(keywords.contains("19E65tOn3tI"));
+        assertTrue(keywords.contains("kbObKrBoIjI"));
+        assertTrue(keywords.contains("3QCgD4R4Ly8"));
+        assertTrue(keywords.contains("RlbGLrMuZ5I"));
+        assertTrue(keywords.contains("7vBsI0Hv5L0"));
+        assertTrue(keywords.contains("Hot"));
     }
 
     @Test
@@ -52,8 +59,8 @@ public class CustomKeywordBlockingTest {
 
         final Set<String> keywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
 
-        // All 8 defaults plus the 2 existing user custom keywords = 10 total
-        assertEquals(10, keywords.size());
+        // All 15 defaults plus the 2 existing user custom keywords = 17 total
+        assertEquals(17, keywords.size());
         assertTrue(keywords.contains("violence"));
         assertTrue(keywords.contains("gambling"));
         for (final String defaultKw : CustomKeywordBlockingFragment.DEFAULT_BLOCKED_KEYWORDS) {
@@ -71,8 +78,8 @@ public class CustomKeywordBlockingTest {
 
         final Set<String> keywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
 
-        // 3 original (PORN, SEX, my_keyword) + 6 remaining defaults (excluding porn and sex) = 9
-        assertEquals(9, keywords.size());
+        // 3 original (PORN, SEX, my_keyword) + 13 remaining defaults (excluding porn and sex) = 16
+        assertEquals(16, keywords.size());
         assertTrue(keywords.contains("my_keyword"));
         assertTrue(keywords.contains("PORN"));
         assertTrue(keywords.contains("SEX"));
@@ -84,7 +91,7 @@ public class CustomKeywordBlockingTest {
     public void testRemovedKeywordIsNotRestoredOnSubsequentCalls() {
         // First access initializes defaults
         final Set<String> initialKeywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
-        assertEquals(8, initialKeywords.size());
+        assertEquals(15, initialKeywords.size());
 
         // Simulate an existing stored preference where a keyword was absent/removed
         final Set<String> modified = new HashSet<>(initialKeywords);
@@ -94,12 +101,12 @@ public class CustomKeywordBlockingTest {
                 .apply();
 
         final Set<String> afterRemoval = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
-        assertEquals(7, afterRemoval.size());
+        assertEquals(14, afterRemoval.size());
         assertFalse(afterRemoval.contains("kiss"));
 
         // Subsequent call must NOT re-add the removed default
         final Set<String> subsequentKeywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
-        assertEquals(7, subsequentKeywords.size());
+        assertEquals(14, subsequentKeywords.size());
         assertFalse(subsequentKeywords.contains("kiss"));
     }
 
@@ -108,7 +115,7 @@ public class CustomKeywordBlockingTest {
         // Ensure defaults are initialized
         CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
 
-        // Test variations of case for all 8 default keywords
+        // Test variations of case for default keywords
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "PORN video"));
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "funny SeX clip"));
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "aashiq banaya song"));
@@ -117,6 +124,9 @@ public class CustomKeywordBlockingTest {
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "INTIMATE moments"));
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "adult content"));
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "XXX rated"));
+        assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "watch 0BAVD9JJE2Q&VL=EN now"));
+        assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "video 19e65ton3ti live"));
+        assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "check hot news"));
     }
 
     @Test
@@ -137,12 +147,12 @@ public class CustomKeywordBlockingTest {
         // Adding an already existing keyword case-insensitively should not duplicate
         CustomKeywordBlockingFragment.addBlockedKeyword(fakeContext, "ADULT");
         final Set<String> keywords = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
-        assertEquals(8, keywords.size());
+        assertEquals(15, keywords.size());
 
         // Adding a new custom keyword
         CustomKeywordBlockingFragment.addBlockedKeyword(fakeContext, "custom_tag");
         final Set<String> afterAdd = CustomKeywordBlockingFragment.getBlockedKeywords(fakeContext);
-        assertEquals(9, afterAdd.size());
+        assertEquals(16, afterAdd.size());
         assertTrue(afterAdd.contains("custom_tag"));
         assertTrue(CustomKeywordBlockingFragment.isSearchQueryBlocked(fakeContext, "find custom_tag today"));
     }
