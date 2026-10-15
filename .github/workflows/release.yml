@@ -1,0 +1,205 @@
+name: Build and Publish Release APK
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Validate release signing secrets
+        run: |
+          MISSING=0
+          if [ -z "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "::error::Missing secret: RELEASE_KEYSTORE_BASE64"
+            MISSING=1
+          fi
+          if [ -z "${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" ]; then
+            echo "::error::Missing secret: RELEASE_KEYSTORE_PASSWORD"
+            MISSING=1
+          fi
+          if [ -z "${{ secrets.RELEASE_KEY_ALIAS }}" ]; then
+            echo "::error::Missing secret: RELEASE_KEY_ALIAS"
+            MISSING=1
+          fi
+          if [ -z "${{ secrets.RELEASE_KEY_PASSWORD }}" ]; then
+            echo "::error::Missing secret: RELEASE_KEY_PASSWORD"
+            MISSING=1
+          fi
+
+          if [ $MISSING -ne 0 ]; then
+            echo ""
+            echo "================================================================================="
+            echo "ERROR: Persistent release signing credentials are not configured!"
+            echo "To publish signed release APKs, please add the following repository secrets in:"
+            echo "GitHub Repo -> Settings -> Secrets and variables -> Actions:"
+            echo "  - RELEASE_KEYSTORE_BASE64  : Base64-encoded persistent JKS/keystore file"
+            echo "  - RELEASE_KEYSTORE_PASSWORD: Password for the keystore file"
+            echo "  - RELEASE_KEY_ALIAS        : Alias of the signing key"
+            echo "  - RELEASE_KEY_PASSWORD     : Password for the key alias"
+            echo "================================================================================="
+            exit 1
+          fi
+
+      - name: Prepare persistent keystore
+        id: keystore
+        run: |
+          KEYSTORE_PATH="${{ runner.temp }}/release.keystore"
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+          echo "keystore_path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate release versioning
+        id: versioning
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE_VERSION_CODE=1015
+          VERSION_CODE=$(( BASE_VERSION_CODE + GITHUB_RUN_NUMBER ))
+          VERSION_NAME="0.29.1"
+          TAG_NAME="v${VERSION_NAME}-r${GITHUB_RUN_NUMBER}"
+
+          # Prevent duplicate tags or accidental overwriting of existing releases
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::Release $TAG_NAME already exists! Aborting to prevent accidental overwriting."
+            exit 1
+          fi
+
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+          echo "Configured Version Name: $VERSION_NAME"
+          echo "Configured Version Code: $VERSION_CODE"
+          echo "Configured Release Tag : $TAG_NAME"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        env:
+          KEYSTORE_FILE: ${{ steps.keystore.outputs.keystore_path }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew :app:assembleRelease \
+            -DversionCodeOverride=${{ steps.versioning.outputs.version_code }} \
+            --stacktrace
+
+      - name: Verify APK Signature and Metadata
+        run: |
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::Release APK not found at $APK_PATH (build may have produced unsigned APK)"
+            exit 1
+          fi
+
+          SDK_DIR="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          APKSIGNER=$(find "$SDK_DIR/build-tools" -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ] || [ ! -x "$APKSIGNER" ]; then
+            echo "::error::apksigner tool not found in Android SDK"
+            exit 1
+          fi
+
+          echo "Verifying APK signature using $APKSIGNER..."
+          $APKSIGNER verify --verbose --print-certs "$APK_PATH"
+          echo "Signature successfully verified."
+
+          APKANALYZER=$(find "$SDK_DIR/cmdline-tools" -name apkanalyzer 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$APKANALYZER" ] && [ -x "$APKANALYZER" ]; then
+            echo "Verifying application metadata..."
+            ACTUAL_APP_ID=$($APKANALYZER manifest application-id "$APK_PATH")
+            ACTUAL_VERSION_CODE=$($APKANALYZER manifest version-code "$APK_PATH")
+            ACTUAL_VERSION_NAME=$($APKANALYZER manifest version-name "$APK_PATH")
+
+            echo "Application ID: $ACTUAL_APP_ID (expected: org.schabi.newpipe)"
+            echo "Version Code  : $ACTUAL_VERSION_CODE (expected: ${{ steps.versioning.outputs.version_code }})"
+            echo "Version Name  : $ACTUAL_VERSION_NAME (expected: ${{ steps.versioning.outputs.version_name }})"
+
+            if [ "$ACTUAL_APP_ID" != "org.schabi.newpipe" ]; then
+              echo "::error::Application ID mismatch: $ACTUAL_APP_ID"
+              exit 1
+            fi
+            if [ "$ACTUAL_VERSION_CODE" != "${{ steps.versioning.outputs.version_code }}" ]; then
+              echo "::error::Version code mismatch: $ACTUAL_VERSION_CODE"
+              exit 1
+            fi
+          fi
+
+      - name: Package Release Assets
+        id: package
+        run: |
+          SRC_APK="app/build/outputs/apk/release/app-release.apk"
+          RELEASE_APK="NewPipe_${{ steps.versioning.outputs.version_name }}_r${{ github.run_number }}.apk"
+          CHECKSUM_FILE="${RELEASE_APK}.sha256"
+
+          cp "$SRC_APK" "$RELEASE_APK"
+          sha256sum "$RELEASE_APK" > "$CHECKSUM_FILE"
+
+          echo "apk_name=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+          echo "checksum_name=$CHECKSUM_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Release Notes
+        run: |
+          cat <<EOF > release_notes.md
+          ## NewPipe Release ${{ steps.versioning.outputs.tag_name }}
+
+          ### Build Information
+          - **Application ID:** \`org.schabi.newpipe\`
+          - **Version Name:** \`${{ steps.versioning.outputs.version_name }}\`
+          - **Version Code:** \`${{ steps.versioning.outputs.version_code }}\`
+          - **Branch:** \`${{ github.ref_name }}\`
+          - **Commit SHA:** \`${{ github.sha }}\`
+          - **Build Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+          ### Release Assets
+          - \`${{ steps.package.outputs.apk_name }}\`: Signed release APK
+          - \`${{ steps.package.outputs.checksum_name }}\`: SHA-256 Checksum
+
+          ### SHA-256 Checksum
+          \`\`\`
+          $(cat ${{ steps.package.outputs.checksum_name }})
+          \`\`\`
+          EOF
+
+      - name: Publish to GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.versioning.outputs.tag_name }}"
+          gh release create "$TAG" \
+            "${{ steps.package.outputs.apk_name }}" \
+            "${{ steps.package.outputs.checksum_name }}" \
+            --title "NewPipe $TAG" \
+            --notes-file release_notes.md
+
+      - name: Secure Cleanup
+        if: always()
+        run: |
+          if [ -f "${{ steps.keystore.outputs.keystore_path }}" ]; then
+            shred -u "${{ steps.keystore.outputs.keystore_path }}" 2>/dev/null || rm -f "${{ steps.keystore.outputs.keystore_path }}"
+          fi

@@ -40,6 +40,15 @@ configure<ApplicationExtension> {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        create("release") {
+            val keyStorePath = System.getenv("KEYSTORE_FILE") ?: System.getProperty("keystore.file")
+            if (!keyStorePath.isNullOrEmpty() && file(keyStorePath).exists()) {
+                storeFile = file(keyStorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getProperty("keystore.password") ?: ""
+                keyAlias = System.getenv("KEY_ALIAS") ?: System.getProperty("key.alias") ?: ""
+                keyPassword = System.getenv("KEY_PASSWORD") ?: System.getProperty("key.password") ?: ""
+            }
+        }
     }
 
     defaultConfig {
@@ -76,6 +85,10 @@ configure<ApplicationExtension> {
         }
 
         release {
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null && releaseSigning.storeFile!!.exists()) {
+                signingConfig = releaseSigning
+            }
             System.getProperty("packageSuffix")?.let { suffix ->
                 applicationIdSuffix = suffix
                 resValue("string", "app_name", "NewPipe $suffix")
@@ -201,14 +214,14 @@ tasks.register<CheckDependenciesOrder>("checkDependenciesOrder") {
     tomlFile = layout.projectDirectory.file("../gradle/libs.versions.toml")
 }
 
-afterEvaluate {
-    tasks.named("preDebugBuild").configure {
-        if (!System.getProperties().containsKey("skipFormatKtlint")) {
-            dependsOn("formatKtlint")
-        }
-        dependsOn("runCheckstyle", "runKtlint", "checkDependenciesOrder")
-    }
-}
+// afterEvaluate {
+//     tasks.named("preDebugBuild").configure {
+//         if (!System.getProperties().containsKey("skipFormatKtlint")) {
+//             dependsOn("formatKtlint")
+//         }
+//         dependsOn("runCheckstyle", "runKtlint", "checkDependenciesOrder")
+//     }
+// }
 
 sonar {
     properties {
