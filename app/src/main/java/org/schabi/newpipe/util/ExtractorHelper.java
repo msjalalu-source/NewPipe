@@ -78,6 +78,9 @@ public final class ExtractorHelper {
                                                final List<String> contentFilter,
                                                final String sortFilter) {
         checkServiceId(serviceId);
+        if (SearchKeywordFilter.isSearchBlocked(searchString)) {
+            return Single.error(new IllegalArgumentException("Blocked search query"));
+        }
         return Single.fromCallable(() ->
                 SearchInfo.getInfo(NewPipe.getService(serviceId),
                         NewPipe.getService(serviceId)
@@ -92,6 +95,9 @@ public final class ExtractorHelper {
             final String sortFilter,
             final Page page) {
         checkServiceId(serviceId);
+        if (SearchKeywordFilter.isSearchBlocked(searchString)) {
+            return Single.error(new IllegalArgumentException("Blocked search query"));
+        }
         return Single.fromCallable(() ->
                 SearchInfo.getMoreItems(NewPipe.getService(serviceId),
                         NewPipe.getService(serviceId)
@@ -102,6 +108,9 @@ public final class ExtractorHelper {
 
     public static Single<List<String>> suggestionsFor(final int serviceId, final String query) {
         checkServiceId(serviceId);
+        if (SearchKeywordFilter.isSearchBlocked(query)) {
+            return Single.just(Collections.emptyList());
+        }
         return Single.fromCallable(() -> {
             final SuggestionExtractor extractor = NewPipe.getService(serviceId)
                     .getSuggestionExtractor();

@@ -905,4 +905,23 @@
     <string name="api23_requirement_dialog_title">NewPipe is dropping support for Android 5</string>
     <string name="api23_requirement_dialog_message">Unfortunately NewPipe depends on a few libraries that dropped support for Android 5.0 and 5.1. The next NewPipe release will therefore only work on devices with Android 6 or higher, sadly. Read more in the blogpost.</string>
     <string name="api23_requirement_dialog_blogpost">Blogpost</string>
+    <string name="search_blocked_message">This search is blocked by restricted keyword filters</string>
+    <string name="blocked_keywords_title">Restricted search keywords</string>
+    <string name="blocked_keywords_summary">Block searches for predefined and custom keywords</string>
+    <string name="blocked_keywords_predefined_category">Predefined protected keywords</string>
+    <string name="blocked_keywords_predefined_summary">These entries are permanent and cannot be modified or deleted.</string>
+    <string name="blocked_keywords_custom_category">Custom protected keywords</string>
+    <string name="blocked_keywords_add_title">Add protected keyword</string>
+    <string name="blocked_keywords_add_summary">Add a custom keyword or phrase to block in searches</string>
+    <string name="blocked_keywords_add_hint">Enter keyword or phrase</string>
+    <string name="blocked_keywords_add_empty">Keyword cannot be empty</string>
+    <string name="blocked_keywords_add_exists">Keyword already exists in protected list</string>
+    <string name="blocked_keywords_added">Protected keyword added</string>
+    <string name="blocked_keywords_delete_confirm_title">Delete protected keyword</string>
+    <string name="blocked_keywords_delete_confirm_message">Are you sure you want to delete \"%s\" from custom protected keywords?</string>
+    <string name="blocked_keywords_deleted">Protected keyword deleted</string>
+    <string name="blocked_keywords_no_custom">No custom keywords added yet</string>
+    <string name="blocked_keywords_predefined_immutable">Predefined keywords cannot be modified or deleted</string>
+    <string name="blocked_keywords_custom_item_summary">Custom (tap to delete)</string>
+    <string name="blocked_keywords_exact_video_id">%s (Video ID)</string>
 </resources>

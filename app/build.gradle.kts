@@ -17,14 +17,9 @@ plugins {
     checkstyle
 }
 
-val gitWorkingBranch = providers.exec {
-    commandLine("git", "rev-parse", "--abbrev-ref", "HEAD")
-}.standardOutput.asText.map { it.trim() }
 val defaultBranches = listOf("master", "dev")
-val workingBranch = gitWorkingBranch.getOrElse("")
-val normalizedWorkingBranch = workingBranch
-    .replaceFirst("^[^A-Za-z]+".toRegex(), "")
-    .replace("[^0-9A-Za-z]+".toRegex(), "")
+val workingBranch = ""
+val normalizedWorkingBranch = ""
 
 kotlin {
     jvmToolchain(21)
@@ -37,6 +32,15 @@ configure<ApplicationExtension> {
         }
     }
     namespace = NEWPIPE_APPLICATION_ID_OLD
+
+    signingConfigs {
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
 
     defaultConfig {
         applicationId = NEWPIPE_APPLICATION_ID_OLD
@@ -58,6 +62,7 @@ configure<ApplicationExtension> {
 
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
             isDebuggable = true
 
             // suffix the app id and the app name with git branch name
@@ -85,8 +90,7 @@ configure<ApplicationExtension> {
 
         register("continuous") {
             initWith(getByName("release"))
-            signingConfig = signingConfigs.getByName("debug")
-            isDefault = true
+            signingConfig = signingConfigs.getByName("debugConfig")
 
             // suffix the app id and the app name with git branch name
             if (normalizedWorkingBranch.isEmpty() || workingBranch in defaultBranches) {

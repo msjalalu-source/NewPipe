@@ -35,6 +35,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -77,6 +78,7 @@ import org.schabi.newpipe.util.Constants;
 import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.ExtractorHelper;
 import org.schabi.newpipe.util.NavigationHelper;
+import org.schabi.newpipe.util.SearchKeywordFilter;
 import org.schabi.newpipe.util.ServiceHelper;
 
 import java.util.ArrayList;
@@ -766,6 +768,10 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     }
 
     private Observable<List<SuggestionItem>> getRemoteSuggestionsObservable(final String query) {
+        final Context context = getContext();
+        if (context != null && SearchKeywordFilter.isSearchBlocked(context, query)) {
+            return Observable.just(Collections.emptyList());
+        }
         return ExtractorHelper
                 .suggestionsFor(serviceId, query)
                 .toObservable()
@@ -855,6 +861,15 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             Log.d(TAG, "search() called with: query = [" + theSearchString + "]");
         }
         if (theSearchString.isEmpty()) {
+            return;
+        }
+
+        final Context context = getContext();
+        if (context != null && SearchKeywordFilter.isSearchBlocked(context, theSearchString)) {
+            Toast.makeText(context, R.string.search_blocked_message, Toast.LENGTH_SHORT).show();
+            hideLoading();
+            infoListAdapter.clearStreamItemList();
+            showEmptyState();
             return;
         }
 

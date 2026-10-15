@@ -1525,4 +1525,6 @@
         <item>@string/image_quality_medium_key</item>
         <item>@string/image_quality_high_key</item>
     </string-array>
+    <string name="blocked_keywords_key">blocked_keywords_key</string>
+    <string name="custom_blocked_keywords_key">custom_blocked_keywords_key</string>
 </resources>
