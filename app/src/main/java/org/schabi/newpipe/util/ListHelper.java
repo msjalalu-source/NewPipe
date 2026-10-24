@@ -28,6 +28,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.MissingResourceException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -141,6 +142,164 @@ public final class ListHelper {
                 .max((o1, o2) -> cmp.compare(o1.get(0), o2.get(0)))
                 .orElse(null);
         return groupedAudioStreams.indexOf(highestRanked);
+    }
+
+    /**
+     * Get the default audio track group index specifically for the download flow.
+     * Follows the required language priority:
+     * 1. Original audio is Bengali: Select Bengali original audio.
+     * 2. Original audio is Hindi: Select Hindi original audio, even if Bengali dubbing
+     *    is available.
+     * 3. Original audio is another language: If a Bengali track is available, select Bengali.
+     * 4. Bengali is unavailable: If Hindi is available, select Hindi.
+     * 5. Neither Bengali nor Hindi is available: Select original track when reliably
+     *    identified; otherwise preserve existing default selection behavior.
+     * 6. Original language cannot be reliably identified: Preserve existing default selection.
+     *
+     * @param context             Android app context
+     * @param groupedAudioStreams grouped list of audio streams by track
+     * @return index of the selected audio track group, or -1 if empty
+     */
+    public static int getDefaultDownloadAudioTrackGroup(
+            final Context context,
+            final List<List<AudioStream>> groupedAudioStreams) {
+        if (groupedAudioStreams == null || groupedAudioStreams.isEmpty()) {
+            return -1;
+        }
+
+        final List<List<AudioStream>> originalGroups = new ArrayList<>();
+        final List<List<AudioStream>> bengaliGroups = new ArrayList<>();
+        final List<List<AudioStream>> hindiGroups = new ArrayList<>();
+
+        for (final List<AudioStream> group : groupedAudioStreams) {
+            if (group == null || group.isEmpty()) {
+                continue;
+            }
+            final AudioStream representative = group.get(0);
+            if (isOriginalAudioTrack(representative)) {
+                originalGroups.add(group);
+            }
+            if (isBengaliAudioTrack(representative)) {
+                bengaliGroups.add(group);
+            }
+            if (isHindiAudioTrack(representative)) {
+                hindiGroups.add(group);
+            }
+        }
+
+        final Comparator<AudioStream> cmp = getAudioTrackComparator(context);
+        final List<AudioStream> bestOriginalGroup = originalGroups.isEmpty() ? null
+                : selectBestTrackGroup(originalGroups, cmp);
+
+        if (bestOriginalGroup != null) {
+            final AudioStream originalStream = bestOriginalGroup.get(0);
+            if (isBengaliAudioTrack(originalStream)) {
+                return groupedAudioStreams.indexOf(bestOriginalGroup);
+            }
+            if (isHindiAudioTrack(originalStream)) {
+                return groupedAudioStreams.indexOf(bestOriginalGroup);
+            }
+        }
+
+        if (!bengaliGroups.isEmpty()) {
+            final List<AudioStream> bestBengaliGroup = selectBestTrackGroup(bengaliGroups, cmp);
+            return groupedAudioStreams.indexOf(bestBengaliGroup);
+        }
+
+        if (!hindiGroups.isEmpty()) {
+            final List<AudioStream> bestHindiGroup = selectBestTrackGroup(hindiGroups, cmp);
+            return groupedAudioStreams.indexOf(bestHindiGroup);
+        }
+
+        if (bestOriginalGroup != null) {
+            return groupedAudioStreams.indexOf(bestOriginalGroup);
+        }
+
+        return getDefaultAudioTrackGroup(context, groupedAudioStreams);
+    }
+
+    /**
+     * Checks if the given audio stream is in Bengali using reliable language metadata.
+     *
+     * @param stream audio stream to check
+     * @return true if language is Bengali
+     */
+    public static boolean isBengaliAudioTrack(@Nullable final AudioStream stream) {
+        if (stream == null) {
+            return false;
+        }
+        final Locale locale = stream.getAudioLocale();
+        if (locale != null) {
+            final String lang = locale.getLanguage();
+            if ("bn".equalsIgnoreCase(lang) || "ben".equalsIgnoreCase(lang)) {
+                return true;
+            }
+            try {
+                if ("ben".equalsIgnoreCase(locale.getISO3Language())) {
+                    return true;
+                }
+            } catch (final MissingResourceException ignored) {
+                // fall through
+            }
+        }
+        return isMatchingLanguageCode(stream.getAudioTrackId(), "bn", "ben");
+    }
+
+    /**
+     * Checks if the given audio stream is in Hindi using reliable language metadata.
+     *
+     * @param stream audio stream to check
+     * @return true if language is Hindi
+     */
+    public static boolean isHindiAudioTrack(@Nullable final AudioStream stream) {
+        if (stream == null) {
+            return false;
+        }
+        final Locale locale = stream.getAudioLocale();
+        if (locale != null) {
+            final String lang = locale.getLanguage();
+            if ("hi".equalsIgnoreCase(lang) || "hin".equalsIgnoreCase(lang)) {
+                return true;
+            }
+            try {
+                if ("hin".equalsIgnoreCase(locale.getISO3Language())) {
+                    return true;
+                }
+            } catch (final MissingResourceException ignored) {
+                // fall through
+            }
+        }
+        return isMatchingLanguageCode(stream.getAudioTrackId(), "hi", "hin");
+    }
+
+    /**
+     * Checks if the given audio stream is reliably identified as the original audio track.
+     *
+     * @param stream audio stream to check
+     * @return true if track type is explicitly ORIGINAL
+     */
+    public static boolean isOriginalAudioTrack(@Nullable final AudioStream stream) {
+        return stream != null && stream.getAudioTrackType() == AudioTrackType.ORIGINAL;
+    }
+
+    private static boolean isMatchingLanguageCode(@Nullable final String trackId,
+                                                  @NonNull final String iso2,
+                                                  @NonNull final String iso3) {
+        if (trackId == null || trackId.isEmpty()) {
+            return false;
+        }
+        final String cleanId = trackId.trim().toLowerCase(Locale.ROOT);
+        return cleanId.equals(iso2) || cleanId.equals(iso3)
+                || cleanId.startsWith(iso2 + "-") || cleanId.startsWith(iso2 + "_")
+                || cleanId.startsWith(iso3 + "-") || cleanId.startsWith(iso3 + "_");
+    }
+
+    private static List<AudioStream> selectBestTrackGroup(
+            @NonNull final List<List<AudioStream>> groups,
+            @NonNull final Comparator<AudioStream> cmp) {
+        return groups.stream()
+                .max((o1, o2) -> cmp.compare(o1.get(0), o2.get(0)))
+                .orElse(groups.get(0));
     }
 
     public static int getAudioFormatIndex(final Context context,
@@ -743,7 +902,10 @@ public final class ListHelper {
      * @return Comparator
      */
     private static Comparator<AudioStream> getAudioFormatComparator(
-            final @NonNull Context context) {
+            @Nullable final Context context) {
+        if (context == null) {
+            return getAudioFormatComparator(null, false);
+        }
         final MediaFormat defaultFormat = getDefaultFormat(context,
                 R.string.default_audio_format_key, R.string.default_audio_format_value);
         return getAudioFormatComparator(defaultFormat, isLimitingDataUsage(context));
@@ -800,7 +962,10 @@ public final class ListHelper {
      * @return Comparator
      */
     private static Comparator<AudioStream> getAudioTrackComparator(
-            @NonNull final Context context) {
+            @Nullable final Context context) {
+        if (context == null) {
+            return getAudioTrackComparator(Locale.getDefault(), true, false);
+        }
         final SharedPreferences preferences =
                 PreferenceManager.getDefaultSharedPreferences(context);
         final Locale preferredLanguage = Localization.getPreferredLocale(context);

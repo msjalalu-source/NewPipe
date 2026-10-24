@@ -169,7 +169,7 @@ public class DownloadDialog extends DialogFragment
                 ListHelper.getGroupedAudioStreams(context, audioStreams);
         this.wrappedAudioTracks = new AudioTracksWrapper(groupedAudioStreams, context);
         this.selectedAudioTrackIndex =
-                ListHelper.getDefaultAudioTrackGroup(context, groupedAudioStreams);
+                ListHelper.getDefaultDownloadAudioTrackGroup(context, groupedAudioStreams);
 
         // TODO: Adapt this code when the downloader support other types of stream deliveries
         final List<VideoStream> videoStreams = ListHelper.getSortedStreamVideosList(
