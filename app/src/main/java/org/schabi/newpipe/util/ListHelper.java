@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.MissingResourceException;
@@ -127,8 +128,36 @@ public final class ListHelper {
 
     public static int getDefaultAudioFormat(final Context context,
                                             final List<AudioStream> audioStreams) {
-        return getAudioIndexByHighestRank(audioStreams,
+        final int oldIndex = getAudioIndexByHighestRank(audioStreams,
                 getAudioTrackComparator(context).thenComparing(getAudioFormatComparator(context)));
+        if (oldIndex < 0) {
+            return oldIndex;
+        }
+
+        // Group streams by track. The track the old rule liked goes first,
+        // so equal-ranked tracks keep the old behavior.
+        final String oldTrackId =
+                Objects.toString(audioStreams.get(oldIndex).getAudioTrackId(), "");
+        final LinkedHashMap<String, List<AudioStream>> byTrack = new LinkedHashMap<>();
+        byTrack.put(oldTrackId, new ArrayList<>());
+        for (final AudioStream stream : audioStreams) {
+            byTrack.computeIfAbsent(Objects.toString(stream.getAudioTrackId(), ""),
+                    k -> new ArrayList<>()).add(stream);
+        }
+        if (byTrack.size() < 2) {
+            return oldIndex;
+        }
+
+        // Same rule as download (Bengali / Hindi / original)
+        final List<List<AudioStream>> groups = new ArrayList<>(byTrack.values());
+        final int groupIndex = getDefaultDownloadAudioTrackGroup(context, groups);
+        if (groupIndex < 0) {
+            return oldIndex;
+        }
+        final List<AudioStream> chosen = groups.get(groupIndex);
+        final int inChosen =
+                getAudioIndexByHighestRank(chosen, getAudioFormatComparator(context));
+        return inChosen < 0 ? oldIndex : audioStreams.indexOf(chosen.get(inChosen));
     }
 
     public static int getDefaultAudioTrackGroup(final Context context,
