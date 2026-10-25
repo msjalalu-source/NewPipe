@@ -150,7 +150,7 @@ public final class ListHelper {
 
         // Same rule as download (Bengali / Hindi / original)
         final List<List<AudioStream>> groups = new ArrayList<>(byTrack.values());
-        final int groupIndex = getDefaultDownloadAudioTrackGroup(context, groups);
+        final int groupIndex = getPreferredAudioTrackGroup(context, groups);
         if (groupIndex < 0) {
             return oldIndex;
         }
@@ -174,7 +174,7 @@ public final class ListHelper {
     }
 
     /**
-     * Get the default audio track group index specifically for the download flow.
+     * Get the preferred audio track group index. Used for both download and playback.
      * Follows the required language priority:
      * 1. Original audio is Bengali: Select Bengali original audio.
      * 2. Original audio is Hindi: Select Hindi original audio, even if Bengali dubbing
@@ -189,7 +189,7 @@ public final class ListHelper {
      * @param groupedAudioStreams grouped list of audio streams by track
      * @return index of the selected audio track group, or -1 if empty
      */
-    public static int getDefaultDownloadAudioTrackGroup(
+    public static int getPreferredAudioTrackGroup(
             final Context context,
             final List<List<AudioStream>> groupedAudioStreams) {
         if (groupedAudioStreams == null || groupedAudioStreams.isEmpty()) {
@@ -342,8 +342,38 @@ public final class ListHelper {
                     return i;
                 }
             }
+
+            // The exact track is not in this video: keep the same language if possible
+            final String language = getTrackIdLanguage(trackId);
+            if (language != null) {
+                final List<AudioStream> sameLanguage = new ArrayList<>();
+                for (final AudioStream s : audioStreams) {
+                    if (language.equals(getTrackIdLanguage(s.getAudioTrackId()))) {
+                        sameLanguage.add(s);
+                    }
+                }
+                final int best = getDefaultAudioFormat(context, sameLanguage);
+                if (best >= 0) {
+                    return audioStreams.indexOf(sameLanguage.get(best));
+                }
+            }
         }
         return getDefaultAudioFormat(context, audioStreams);
+    }
+
+    /**
+     * Get the language part of a track id such as "en-US.4" or "hi.10".
+     *
+     * @param trackId the audio track id
+     * @return the lower-case language code, or null if the id does not start with one
+     */
+    @Nullable
+    private static String getTrackIdLanguage(@Nullable final String trackId) {
+        if (trackId == null) {
+            return null;
+        }
+        final String lang = trackId.trim().split("[.\\-_]")[0].toLowerCase(Locale.ROOT);
+        return lang.matches("[a-z]{2,3}") ? lang : null;
     }
 
     /**

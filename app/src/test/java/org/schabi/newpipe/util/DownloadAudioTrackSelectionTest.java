@@ -48,7 +48,7 @@ public class DownloadAudioTrackSelectionTest {
                 List.of(hindiDubbed)
         );
 
-        final int selectedIndex = ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+        final int selectedIndex = ListHelper.getPreferredAudioTrackGroup(null, groups);
         assertEquals(1, selectedIndex);
         assertEquals("bn_orig", groups.get(selectedIndex).get(0).getAudioTrackId());
     }
@@ -72,7 +72,7 @@ public class DownloadAudioTrackSelectionTest {
                 List.of(englishDubbed)
         );
 
-        final int selectedIndex = ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+        final int selectedIndex = ListHelper.getPreferredAudioTrackGroup(null, groups);
         assertEquals(1, selectedIndex);
         assertEquals("hi_orig", groups.get(selectedIndex).get(0).getAudioTrackId());
     }
@@ -96,7 +96,7 @@ public class DownloadAudioTrackSelectionTest {
                 List.of(bengaliDubbed)
         );
 
-        final int selectedIndex = ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+        final int selectedIndex = ListHelper.getPreferredAudioTrackGroup(null, groups);
         assertEquals(2, selectedIndex);
         assertEquals("bn_dub", groups.get(selectedIndex).get(0).getAudioTrackId());
     }
@@ -119,7 +119,7 @@ public class DownloadAudioTrackSelectionTest {
                 List.of(hindiDubbed)
         );
 
-        final int selectedIndex = ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+        final int selectedIndex = ListHelper.getPreferredAudioTrackGroup(null, groups);
         assertEquals(2, selectedIndex);
         assertEquals("hi_dub", groups.get(selectedIndex).get(0).getAudioTrackId());
     }
@@ -143,7 +143,7 @@ public class DownloadAudioTrackSelectionTest {
                 List.of(spanishDubbed)
         );
 
-        final int selectedIndex = ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+        final int selectedIndex = ListHelper.getPreferredAudioTrackGroup(null, groups);
         assertEquals(1, selectedIndex);
         assertEquals("ja_orig", groups.get(selectedIndex).get(0).getAudioTrackId());
     }
@@ -168,7 +168,7 @@ public class DownloadAudioTrackSelectionTest {
         );
 
         final int downloadSelectedIndex =
-                ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+                ListHelper.getPreferredAudioTrackGroup(null, groups);
         final int defaultSelectedIndex = ListHelper.getDefaultAudioTrackGroup(null, groups);
 
         assertEquals(defaultSelectedIndex, downloadSelectedIndex);
@@ -221,7 +221,7 @@ public class DownloadAudioTrackSelectionTest {
                 List.of(bengaliOriginal)
         );
 
-        final int selectedIndex = ListHelper.getDefaultDownloadAudioTrackGroup(null, groups);
+        final int selectedIndex = ListHelper.getPreferredAudioTrackGroup(null, groups);
         assertEquals(1, selectedIndex);
         assertEquals("bn_orig", groups.get(selectedIndex).get(0).getAudioTrackId());
     }
